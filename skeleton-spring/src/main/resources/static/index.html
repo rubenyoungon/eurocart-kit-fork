@@ -47,46 +47,113 @@
   <p id="error"></p>
   <main>
     <section>
-      <h2>Products</h2>
-      <p class="muted">Prices in <span id="currency-code">EUR</span>, excluding shipping and VAT. Click a product to see its price including VAT.</p>
+      <h2 data-i18n="products">Products</h2>
+      <p class="muted" id="products-note"></p>
       <div id="products"></div>
     </section>
     <section>
-      <h2>Cart</h2>
+      <h2 data-i18n="cart">Cart</h2>
       <table>
-        <thead><tr><th>Product</th><th class="num">Price incl. VAT</th><th class="num">Qty</th><th class="num">Line total</th><th class="num">VAT</th><th></th></tr></thead>
+        <thead><tr><th data-i18n="product">Product</th><th class="num" data-i18n="priceInclVat">Price incl. VAT</th><th class="num" data-i18n="qty">Qty</th><th class="num" data-i18n="lineTotal">Line total</th><th class="num" data-i18n="vat">VAT</th><th></th></tr></thead>
         <tbody id="cart-lines"></tbody>
         <tfoot>
-          <tr><td>Subtotal (excl. VAT)</td><td></td><td></td><td class="num" id="subtotal"></td><td></td><td></td></tr>
-          <tr><td>VAT (<span id="vat-country">NL</span>)</td><td></td><td></td><td class="num" id="vat"></td><td></td><td></td></tr>
-          <tr><td>Total (incl. VAT)</td><td></td><td></td><td class="num" id="total"></td><td></td><td></td></tr>
+          <tr><td data-i18n="subtotal">Subtotal (excl. VAT)</td><td></td><td></td><td class="num" id="subtotal"></td><td></td><td></td></tr>
+          <tr><td id="vat-label"></td><td></td><td></td><td class="num" id="vat"></td><td></td><td></td></tr>
+          <tr><td data-i18n="total">Total (incl. VAT)</td><td></td><td></td><td class="num" id="total"></td><td></td><td></td></tr>
         </tfoot>
       </table>
-      <p><button id="buy">Buy</button></p>
+      <p><button id="buy" data-i18n="buy">Buy</button></p>
       <p id="confirmation"></p>
     </section>
   </main>
 
   <script>
+    const messages = {
+      en: {
+        products: 'Products', cart: 'Cart', product: 'Product', origin: 'Origin', exclVat: 'Excl. VAT',
+        priceExclVat: 'Price excl. VAT', priceInclVat: 'Price incl. VAT', qty: 'Qty', lineTotal: 'Line total', vat: 'VAT',
+        subtotal: 'Subtotal (excl. VAT)', total: 'Total (incl. VAT)', buy: 'Buy', add: 'Add', remove: 'Remove',
+        productCode: 'Product code', vatCountry: 'VAT ({country})', vatRate: 'VAT ({rate}%)',
+        productsNote: 'Prices in {currency}, excluding shipping and VAT. Click a product to see its price including VAT.',
+        orderPlaced: 'Order #{number} placed: {total} (incl. {vat} VAT).',
+        categories: { LAPTOP: 'Laptops', BOOK: 'Books', FOOD: 'Food', MEDICINE: 'Medicine', EBOOK: 'E-books' },
+      },
+      nl: {
+        products: 'Producten', cart: 'Winkelwagen', product: 'Product', origin: 'Herkomst', exclVat: 'Excl. btw',
+        priceExclVat: 'Prijs excl. btw', priceInclVat: 'Prijs incl. btw', qty: 'Aantal', lineTotal: 'Regeltotaal', vat: 'Btw',
+        subtotal: 'Subtotaal (excl. btw)', total: 'Totaal (incl. btw)', buy: 'Kopen', add: 'Toevoegen', remove: 'Verwijderen',
+        productCode: 'Productcode', vatCountry: 'Btw ({country})', vatRate: 'Btw ({rate}%)',
+        productsNote: 'Prijzen in {currency}, exclusief verzendkosten en btw. Klik op een product om de prijs inclusief btw te zien.',
+        orderPlaced: 'Bestelling #{number} geplaatst: {total} (incl. {vat} btw).',
+        categories: { LAPTOP: 'Laptops', BOOK: 'Boeken', FOOD: 'Voeding', MEDICINE: 'Medicijnen', EBOOK: 'E-books' },
+      },
+      pl: {
+        products: 'Produkty', cart: 'Koszyk', product: 'Produkt', origin: 'Pochodzenie', exclVat: 'Netto',
+        priceExclVat: 'Cena netto', priceInclVat: 'Cena brutto', qty: 'Ilość', lineTotal: 'Wartość', vat: 'VAT',
+        subtotal: 'Suma netto', total: 'Razem brutto', buy: 'Kup', add: 'Dodaj', remove: 'Usuń',
+        productCode: 'Kod produktu', vatCountry: 'VAT ({country})', vatRate: 'VAT ({rate}%)',
+        productsNote: 'Ceny w {currency}, bez kosztów wysyłki i VAT. Kliknij produkt, aby zobaczyć cenę z VAT.',
+        orderPlaced: 'Zamówienie nr {number} złożone: {total} (w tym {vat} VAT).',
+        categories: { LAPTOP: 'Laptopy', BOOK: 'Książki', FOOD: 'Żywność', MEDICINE: 'Leki', EBOOK: 'E-booki' },
+      },
+      de: {
+        products: 'Produkte', cart: 'Warenkorb', product: 'Produkt', origin: 'Herkunft', exclVat: 'Exkl. MwSt.',
+        priceExclVat: 'Preis exkl. MwSt.', priceInclVat: 'Preis inkl. MwSt.', qty: 'Menge', lineTotal: 'Summe', vat: 'MwSt.',
+        subtotal: 'Zwischensumme (exkl. MwSt.)', total: 'Gesamt (inkl. MwSt.)', buy: 'Kaufen', add: 'Hinzufügen', remove: 'Entfernen',
+        productCode: 'Artikelnummer', vatCountry: 'MwSt. ({country})', vatRate: 'MwSt. ({rate} %)',
+        productsNote: 'Preise in {currency}, ohne Versand und MwSt. Klicken Sie auf ein Produkt, um den Preis inkl. MwSt. zu sehen.',
+        orderPlaced: 'Bestellung Nr. {number} aufgegeben: {total} (inkl. {vat} MwSt.).',
+        categories: { LAPTOP: 'Laptops', BOOK: 'Bücher', FOOD: 'Lebensmittel', MEDICINE: 'Medikamente', EBOOK: 'E-Books' },
+      },
+      fr: {
+        products: 'Produits', cart: 'Panier', product: 'Produit', origin: 'Origine', exclVat: 'HT',
+        priceExclVat: 'Prix HT', priceInclVat: 'Prix TTC', qty: 'Qté', lineTotal: 'Total ligne', vat: 'TVA',
+        subtotal: 'Sous-total HT', total: 'Total TTC', buy: 'Acheter', add: 'Ajouter', remove: 'Retirer',
+        productCode: 'Référence', vatCountry: 'TVA ({country})', vatRate: 'TVA ({rate} %)',
+        productsNote: 'Prix en {currency}, hors frais de port et hors TVA. Cliquez sur un produit pour voir son prix TTC.',
+        orderPlaced: 'Commande n° {number} passée : {total} (dont {vat} de TVA).',
+        categories: { LAPTOP: 'Ordinateurs portables', BOOK: 'Livres', FOOD: 'Alimentation', MEDICINE: 'Médicaments', EBOOK: 'Livres numériques' },
+      },
+    };
+    const defaultLocales = { en: 'en-GB', nl: 'nl-NL', pl: 'pl-PL', de: 'de-DE', fr: 'fr-FR' };
+
+    // On /pl the shop acts as if the customer is in Poland (PLN, Polish VAT, Polish texts), whatever the browser language.
+    const forcePoland = /^\/pl\/?$/.test(location.pathname);
+    const headers = { 'Content-Type': 'application/json' };
+    if (forcePoland) {
+      headers['Accept-Language'] = 'pl-PL';
+    }
+
+    // Texts follow the first browser language we have translations for; the browser's own locale (fr-CH, de-AT)
+    // is kept for number formatting when it matches that language.
+    const browserLocale = forcePoland ? 'pl-PL'
+      : (navigator.languages || [navigator.language]).find(l => messages[l.split('-')[0].toLowerCase()]) || 'en-GB';
+    const lang = browserLocale.split('-')[0].toLowerCase();
+    const locale = browserLocale.includes('-') ? browserLocale : defaultLocales[lang];
+    document.documentElement.lang = lang;
+
+    function t(key, params = {}) {
+      return messages[lang][key].replace(/\{(\w+)\}/g, (_, name) => params[name]);
+    }
+
+    for (const el of document.querySelectorAll('[data-i18n]')) {
+      el.textContent = t(el.dataset.i18n);
+    }
+
     // The server picks the currency from the customer's location; we show whatever the cart is priced in.
     let money = formatterFor('EUR');
 
     function formatterFor(code) {
-      return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: code });
+      return new Intl.NumberFormat(locale, { style: 'currency', currency: code });
     }
 
     function useCurrency(code) {
       money = formatterFor(code);
-      document.getElementById('currency-code').textContent = code;
+      document.getElementById('products-note').textContent = t('productsNote', { currency: code });
     }
+    useCurrency('EUR');
     const errorEl = document.getElementById('error');
     const confirmationEl = document.getElementById('confirmation');
-
-    // On /pl the shop acts as if the customer is in Poland (PLN, Polish VAT), whatever the browser language.
-    const headers = { 'Content-Type': 'application/json' };
-    if (/^\/pl\/?$/.test(location.pathname)) {
-      headers['Accept-Language'] = 'pl-PL';
-    }
 
     async function api(path, options) {
       errorEl.textContent = '';
@@ -102,7 +169,7 @@
 
     function addButton(productId) {
       const button = document.createElement('button');
-      button.textContent = 'Add';
+      button.textContent = t('add');
       button.onclick = () => addToCart(productId);
       return button;
     }
@@ -123,13 +190,13 @@
       collapsible.open = true;
       const summary = document.createElement('summary');
       const heading = document.createElement('h3');
-      heading.textContent = category;
+      heading.textContent = messages[lang].categories[category] || category;
       summary.appendChild(heading);
       collapsible.appendChild(summary);
       container.appendChild(collapsible);
       const table = document.createElement('table');
       table.createTHead().innerHTML =
-        '<tr><th>Product</th><th>Origin</th><th class="num">Excl. VAT</th><th></th></tr>';
+        `<tr><th>${t('product')}</th><th>${t('origin')}</th><th class="num">${t('exclVat')}</th><th></th></tr>`;
       for (const p of items) {
         const row = table.insertRow();
         // A click on the product name unfolds its details, including the price incl. VAT, in the row below.
@@ -161,10 +228,10 @@
     function renderProductDetail(p) {
       const details = document.createElement('dl');
       for (const [label, value, className] of [
-        ['Product code', p.id],
-        ['Price excl. VAT', money.format(p.price)],
-        [`VAT (${p.vatRate}%)`, money.format(p.priceInclVat - p.price)],
-        ['Price incl. VAT', money.format(p.priceInclVat), 'incl-vat'],
+        [t('productCode'), p.id],
+        [t('priceExclVat'), money.format(p.price)],
+        [t('vatRate', { rate: p.vatRate }), money.format(p.priceInclVat - p.price)],
+        [t('priceInclVat'), money.format(p.priceInclVat), 'incl-vat'],
       ]) {
         const dt = document.createElement('dt'); dt.textContent = label;
         const dd = document.createElement('dd'); dd.textContent = value;
@@ -187,13 +254,13 @@
         const vat = row.insertCell(); vat.className = 'num muted'; vat.textContent = `${line.vatRate}%`;
         const action = row.insertCell(); action.className = 'num';
         const button = document.createElement('button');
-        button.textContent = 'Remove';
+        button.textContent = t('remove');
         button.onclick = () => removeFromCart(line.product.id);
         action.appendChild(button);
       }
       document.getElementById('subtotal').textContent = money.format(cart.subtotal);
       document.getElementById('vat').textContent = money.format(cart.vat);
-      document.getElementById('vat-country').textContent = cart.country;
+      document.getElementById('vat-label').textContent = t('vatCountry', { country: cart.country });
       document.getElementById('total').textContent = money.format(cart.total);
       document.getElementById('buy').disabled = cart.lines.length === 0;
     }
@@ -210,7 +277,7 @@
       const order = await api('/api/cart/checkout', { method: 'POST' });
       renderCart({ lines: [], subtotal: 0, vat: 0, total: 0, currency: order.currency, country: order.country });
       confirmationEl.textContent =
-        `Order #${order.orderNumber} placed: ${money.format(order.total)} (incl. ${money.format(order.vat)} VAT).`;
+        t('orderPlaced', { number: order.orderNumber, total: money.format(order.total), vat: money.format(order.vat) });
     };
 
 
