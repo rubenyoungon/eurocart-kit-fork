@@ -8,8 +8,7 @@
     :root { --accent: #1f4fbf; --accent-dark: #173c91; --accent-soft: #e9effb; }
     body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #f6f6f6; color: #222; }
     h1 { margin: 0 0 1rem; color: var(--accent); }
-    main { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+    main { max-width: 800px; }
     section { background: #fff; border-radius: 8px; border-top: 4px solid var(--accent); padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
     h2 { margin: 0 0 .5rem; font-size: 1.1rem; color: var(--accent-dark); }
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -40,18 +39,38 @@
     .product-detail dt { color: #666; }
     .product-detail dd { margin: 0; }
     .product-detail .incl-vat { font-weight: bold; color: var(--accent-dark); }
+    #choose { font-size: 1rem; padding: .4rem 1rem; margin-bottom: 1rem; }
+    #product-dialog { width: min(700px, calc(100% - 2rem)); max-height: 85vh; padding: 0; border: 0; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,.25); }
+    #product-dialog::backdrop { background: rgba(0,0,0,.4); }
+    #product-dialog section { box-shadow: none; }
+    #product-dialog .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
+    #product-dialog .dialog-actions button { padding: .4rem 1rem; }
+    #add-selected { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
+    #add-selected:hover { background: var(--accent-dark); color: #fff; }
+    #add-selected:disabled { background: #ccc; border-color: #bbb; cursor: default; }
   </style>
 </head>
 <body>
   <h1>EuroCart</h1>
   <p id="error"></p>
+  <p id="confirmation"></p>
+  <button id="choose" data-i18n="chooseProducts">Choose products</button>
+  <dialog id="product-dialog" aria-labelledby="products-heading">
+    <form method="dialog">
+      <section>
+        <h2 id="products-heading" data-i18n="products">Products</h2>
+        <p class="muted" id="products-note"></p>
+        <div id="products"></div>
+        <div class="dialog-actions">
+          <button value="cancel" data-i18n="cancel">Cancel</button>
+          <button value="add" id="add-selected" data-i18n="addToCart" disabled>Add to cart</button>
+        </div>
+      </section>
+    </form>
+  </dialog>
   <main>
-    <section>
-      <h2 data-i18n="products">Products</h2>
-      <p class="muted" id="products-note"></p>
-      <div id="products"></div>
-    </section>
-    <section>
+    <!-- The cart stays hidden until products have been picked in the dialog. -->
+    <section id="cart" hidden>
       <h2 data-i18n="cart">Cart</h2>
       <table>
         <thead><tr><th data-i18n="product">Product</th><th class="num" data-i18n="priceInclVat">Price incl. VAT</th><th class="num" data-i18n="qty">Qty</th><th class="num" data-i18n="lineTotal">Line total</th><th class="num" data-i18n="vat">VAT</th><th></th></tr></thead>
@@ -63,7 +82,6 @@
         </tfoot>
       </table>
       <p><button id="buy" data-i18n="buy">Buy</button></p>
-      <p id="confirmation"></p>
     </section>
   </main>
 
@@ -72,7 +90,8 @@
       en: {
         products: 'Products', cart: 'Cart', product: 'Product', origin: 'Origin', exclVat: 'Excl. VAT',
         priceExclVat: 'Price excl. VAT', priceInclVat: 'Price incl. VAT', qty: 'Qty', lineTotal: 'Line total', vat: 'VAT',
-        subtotal: 'Subtotal (excl. VAT)', total: 'Total (incl. VAT)', buy: 'Buy', add: 'Add', remove: 'Remove',
+        subtotal: 'Subtotal (excl. VAT)', total: 'Total (incl. VAT)', buy: 'Buy', addToCart: 'Add to cart', remove: 'Remove',
+        chooseProducts: 'Choose products', cancel: 'Cancel',
         productCode: 'Product code', vatCountry: 'VAT ({country})', vatRate: 'VAT ({rate}%)',
         productsNote: 'Prices in {currency}, excluding shipping and VAT. Click a product to see its price including VAT.',
         orderPlaced: 'Order #{number} placed: {total} (incl. {vat} VAT).',
@@ -81,7 +100,8 @@
       nl: {
         products: 'Producten', cart: 'Winkelwagen', product: 'Product', origin: 'Herkomst', exclVat: 'Excl. btw',
         priceExclVat: 'Prijs excl. btw', priceInclVat: 'Prijs incl. btw', qty: 'Aantal', lineTotal: 'Regeltotaal', vat: 'Btw',
-        subtotal: 'Subtotaal (excl. btw)', total: 'Totaal (incl. btw)', buy: 'Kopen', add: 'Toevoegen', remove: 'Verwijderen',
+        subtotal: 'Subtotaal (excl. btw)', total: 'Totaal (incl. btw)', buy: 'Kopen', addToCart: 'In winkelwagen', remove: 'Verwijderen',
+        chooseProducts: 'Producten kiezen', cancel: 'Annuleren',
         productCode: 'Productcode', vatCountry: 'Btw ({country})', vatRate: 'Btw ({rate}%)',
         productsNote: 'Prijzen in {currency}, exclusief verzendkosten en btw. Klik op een product om de prijs inclusief btw te zien.',
         orderPlaced: 'Bestelling #{number} geplaatst: {total} (incl. {vat} btw).',
@@ -90,7 +110,8 @@
       pl: {
         products: 'Produkty', cart: 'Koszyk', product: 'Produkt', origin: 'Pochodzenie', exclVat: 'Netto',
         priceExclVat: 'Cena netto', priceInclVat: 'Cena brutto', qty: 'Ilość', lineTotal: 'Wartość', vat: 'VAT',
-        subtotal: 'Suma netto', total: 'Razem brutto', buy: 'Kup', add: 'Dodaj', remove: 'Usuń',
+        subtotal: 'Suma netto', total: 'Razem brutto', buy: 'Kup', addToCart: 'Dodaj do koszyka', remove: 'Usuń',
+        chooseProducts: 'Wybierz produkty', cancel: 'Anuluj',
         productCode: 'Kod produktu', vatCountry: 'VAT ({country})', vatRate: 'VAT ({rate}%)',
         productsNote: 'Ceny w {currency}, bez kosztów wysyłki i VAT. Kliknij produkt, aby zobaczyć cenę z VAT.',
         orderPlaced: 'Zamówienie nr {number} złożone: {total} (w tym {vat} VAT).',
@@ -99,7 +120,8 @@
       de: {
         products: 'Produkte', cart: 'Warenkorb', product: 'Produkt', origin: 'Herkunft', exclVat: 'Exkl. MwSt.',
         priceExclVat: 'Preis exkl. MwSt.', priceInclVat: 'Preis inkl. MwSt.', qty: 'Menge', lineTotal: 'Summe', vat: 'MwSt.',
-        subtotal: 'Zwischensumme (exkl. MwSt.)', total: 'Gesamt (inkl. MwSt.)', buy: 'Kaufen', add: 'Hinzufügen', remove: 'Entfernen',
+        subtotal: 'Zwischensumme (exkl. MwSt.)', total: 'Gesamt (inkl. MwSt.)', buy: 'Kaufen', addToCart: 'In den Warenkorb', remove: 'Entfernen',
+        chooseProducts: 'Produkte auswählen', cancel: 'Abbrechen',
         productCode: 'Artikelnummer', vatCountry: 'MwSt. ({country})', vatRate: 'MwSt. ({rate} %)',
         productsNote: 'Preise in {currency}, ohne Versand und MwSt. Klicken Sie auf ein Produkt, um den Preis inkl. MwSt. zu sehen.',
         orderPlaced: 'Bestellung Nr. {number} aufgegeben: {total} (inkl. {vat} MwSt.).',
@@ -108,7 +130,8 @@
       fr: {
         products: 'Produits', cart: 'Panier', product: 'Produit', origin: 'Origine', exclVat: 'HT',
         priceExclVat: 'Prix HT', priceInclVat: 'Prix TTC', qty: 'Qté', lineTotal: 'Total ligne', vat: 'TVA',
-        subtotal: 'Sous-total HT', total: 'Total TTC', buy: 'Acheter', add: 'Ajouter', remove: 'Retirer',
+        subtotal: 'Sous-total HT', total: 'Total TTC', buy: 'Acheter', addToCart: 'Ajouter au panier', remove: 'Retirer',
+        chooseProducts: 'Choisir des produits', cancel: 'Annuler',
         productCode: 'Référence', vatCountry: 'TVA ({country})', vatRate: 'TVA ({rate} %)',
         productsNote: 'Prix en {currency}, hors frais de port et hors TVA. Cliquez sur un produit pour voir son prix TTC.',
         orderPlaced: 'Commande n° {number} passée : {total} (dont {vat} de TVA).',
@@ -167,11 +190,13 @@
       return body;
     }
 
-    function addButton(productId) {
-      const button = document.createElement('button');
-      button.textContent = t('add');
-      button.onclick = () => addToCart(productId);
-      return button;
+    function selectBox(product) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.name = 'product';
+      checkbox.value = product.id;
+      checkbox.setAttribute('aria-label', product.name);
+      return checkbox;
     }
 
     function renderProducts(products) {
@@ -201,6 +226,7 @@
         const row = table.insertRow();
         // A click on the product name unfolds its details, including the price incl. VAT, in the row below.
         const toggle = document.createElement('button');
+        toggle.type = 'button'; // the list sits in the dialog's form; a plain button would submit and close it
         toggle.className = 'product-toggle';
         toggle.textContent = p.name;
         toggle.setAttribute('aria-expanded', 'false');
@@ -208,7 +234,7 @@
         row.insertCell().innerHTML = `<span class="muted">${p.countryOfOrigin}</span>`;
         const price = row.insertCell(); price.className = 'num'; price.textContent = money.format(p.price);
         const action = row.insertCell(); action.className = 'num';
-        action.appendChild(addButton(p.id));
+        action.appendChild(selectBox(p));
 
         const detailRow = table.insertRow();
         detailRow.className = 'product-detail';
@@ -263,11 +289,38 @@
       document.getElementById('vat-label').textContent = t('vatCountry', { country: cart.country });
       document.getElementById('total').textContent = money.format(cart.total);
       document.getElementById('buy').disabled = cart.lines.length === 0;
+      document.getElementById('cart').hidden = cart.lines.length === 0;
     }
 
-    async function addToCart(productId) {
-      renderCart(await api('/api/cart/items', { method: 'POST', body: JSON.stringify({ productId, quantity: 1 }) }));
+    async function addToCart(productIds) {
+      let cart;
+      for (const productId of productIds) {
+        cart = await api('/api/cart/items', { method: 'POST', body: JSON.stringify({ productId, quantity: 1 }) });
+      }
+      renderCart(cart);
     }
+
+    // Products are picked with checkboxes in the dialog and only added to the cart on "Add to cart".
+    const dialog = document.getElementById('product-dialog');
+    const productForm = dialog.querySelector('form');
+    const addSelectedButton = document.getElementById('add-selected');
+
+    function selectedProductIds() {
+      return [...productForm.querySelectorAll('input[name="product"]:checked')].map(box => box.value);
+    }
+
+    document.getElementById('choose').onclick = () => {
+      productForm.reset();
+      addSelectedButton.disabled = true;
+      dialog.returnValue = ''; // Escape keeps the previous returnValue, which must not count as "add"
+      dialog.showModal();
+    };
+    productForm.onchange = () => { addSelectedButton.disabled = selectedProductIds().length === 0; };
+    dialog.onclose = () => {
+      if (dialog.returnValue === 'add') {
+        addToCart(selectedProductIds());
+      }
+    };
 
     async function removeFromCart(productId) {
       renderCart(await api(`/api/cart/items/${productId}`, { method: 'DELETE' }));
