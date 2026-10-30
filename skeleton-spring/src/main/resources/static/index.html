@@ -32,7 +32,7 @@
   <main>
     <section>
       <h2>Products</h2>
-      <p class="muted">Prices in <span id="currency-code">EUR</span>, excluding VAT and shipping.</p>
+      <p class="muted">Prices in <span id="currency-code">EUR</span>, excluding shipping. Shown excl. VAT and incl. VAT.</p>
       <div id="products"></div>
     </section>
     <section>
@@ -91,7 +91,10 @@
           const row = table.insertRow();
           row.insertCell().textContent = p.name;
           row.insertCell().innerHTML = `<span class="muted">${p.countryOfOrigin}</span>`;
-          const price = row.insertCell(); price.className = 'num'; price.textContent = money.format(p.price);
+          const price = row.insertCell(); price.className = 'num muted'; price.textContent = money.format(p.price);
+          const inclVat = row.insertCell(); inclVat.className = 'num';
+          inclVat.textContent = money.format(p.priceInclVat);
+          inclVat.title = `incl. ${p.vatRate}% VAT`;
           const action = row.insertCell(); action.className = 'num';
           const button = document.createElement('button');
           button.textContent = 'Add';

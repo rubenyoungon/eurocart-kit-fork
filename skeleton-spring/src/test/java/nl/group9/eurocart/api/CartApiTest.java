@@ -42,6 +42,18 @@ class CartApiTest {
 	}
 
 	@Test
+	void productsShowPriceInclVatForCustomerCountry() throws Exception {
+		mockMvc.perform(get("/api/products").header("Accept-Language", "nl-NL"))
+				.andExpect(jsonPath("$[?(@.id == 'LAP-001')].vatRate").value(21))
+				.andExpect(jsonPath("$[?(@.id == 'LAP-001')].priceInclVat").value(1087.79))
+				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].priceInclVat").value(13.63));
+
+		mockMvc.perform(get("/api/products").header("Accept-Language", "de-CH"))
+				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].vatRate").value(2.6))
+				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].priceInclVat").value(12.83));
+	}
+
+	@Test
 	void addsItemAndReturnsCartWithSubtotal() throws Exception {
 		mockMvc.perform(post("/api/cart/items")
 				.contentType(MediaType.APPLICATION_JSON)
