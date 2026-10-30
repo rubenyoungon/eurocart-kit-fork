@@ -20,6 +20,10 @@
     tfoot td { font-weight: bold; border-top: 2px solid #ccc; }
     .muted { color: #888; font-size: .85rem; }
     #error { color: #b00; min-height: 1.2em; }
+    #confirmation { color: #070; }
+    #buy { background: #2a7; border-color: #185; color: #fff; font-weight: bold; }
+    #buy:hover { background: #185; }
+    #buy:disabled { background: #ccc; border-color: #bbb; cursor: default; }
   </style>
 </head>
 <body>
@@ -28,26 +32,43 @@
   <main>
     <section>
       <h2>Products</h2>
-      <p class="muted">Prices in EUR, excluding VAT and shipping.</p>
+      <p class="muted">Prices in <span id="currency-code">EUR</span>, excluding VAT and shipping.</p>
       <div id="products"></div>
     </section>
     <section>
       <h2>Cart</h2>
       <table>
-        <thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Line total</th><th></th></tr></thead>
+        <thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Line total</th><th class="num">VAT</th><th></th></tr></thead>
         <tbody id="cart-lines"></tbody>
-        <tfoot><tr><td>Subtotal (excl. VAT)</td><td></td><td class="num" id="subtotal">€ 0,00</td><td></td></tr></tfoot>
+        <tfoot>
+          <tr><td>Subtotal (excl. VAT)</td><td></td><td class="num" id="subtotal"></td><td></td><td></td></tr>
+          <tr><td>VAT (<span id="vat-country">NL</span>)</td><td></td><td class="num" id="vat"></td><td></td><td></td></tr>
+          <tr><td>Total (incl. VAT)</td><td></td><td class="num" id="total"></td><td></td><td></td></tr>
+        </tfoot>
       </table>
-      <p><button id="clear">Empty cart</button></p>
+      <p><button id="buy">Buy</button> <button id="clear">Empty cart</button></p>
+      <p id="confirmation"></p>
     </section>
   </main>
 
   <script>
-    const eur = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
+    // The server picks the currency from the customer's location; we show whatever the cart is priced in.
+    let money = formatterFor('EUR');
+
+    function formatterFor(code) {
+      return new Intl.NumberFormat('nl-NL', { style: 'currency', currency: code });
+    }
+
+    function useCurrency(code) {
+      money = formatterFor(code);
+      document.getElementById('currency-code').textContent = code;
+    }
     const errorEl = document.getElementById('error');
+    const confirmationEl = document.getElementById('confirmation');
 
     async function api(path, options) {
       errorEl.textContent = '';
+      confirmationEl.textContent = '';
       const response = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
@@ -70,7 +91,7 @@
           const row = table.insertRow();
           row.insertCell().textContent = p.name;
           row.insertCell().innerHTML = `<span class="muted">${p.countryOfOrigin}</span>`;
-          const price = row.insertCell(); price.className = 'num'; price.textContent = eur.format(p.price);
+          const price = row.insertCell(); price.className = 'num'; price.textContent = money.format(p.price);
           const action = row.insertCell(); action.className = 'num';
           const button = document.createElement('button');
           button.textContent = 'Add';
@@ -82,20 +103,26 @@
     }
 
     function renderCart(cart) {
+      useCurrency(cart.currency);
       const tbody = document.getElementById('cart-lines');
       tbody.innerHTML = '';
       for (const line of cart.lines) {
         const row = tbody.insertRow();
         row.insertCell().textContent = line.product.name;
         const qty = row.insertCell(); qty.className = 'num'; qty.textContent = line.quantity;
-        const total = row.insertCell(); total.className = 'num'; total.textContent = eur.format(line.lineTotal);
+        const total = row.insertCell(); total.className = 'num'; total.textContent = money.format(line.lineTotal);
+        const vat = row.insertCell(); vat.className = 'num muted'; vat.textContent = `${line.vatRate}%`;
         const action = row.insertCell(); action.className = 'num';
         const button = document.createElement('button');
         button.textContent = 'Remove';
         button.onclick = () => removeFromCart(line.product.id);
         action.appendChild(button);
       }
-      document.getElementById('subtotal').textContent = eur.format(cart.subtotal);
+      document.getElementById('subtotal').textContent = money.format(cart.subtotal);
+      document.getElementById('vat').textContent = money.format(cart.vat);
+      document.getElementById('vat-country').textContent = cart.country;
+      document.getElementById('total').textContent = money.format(cart.total);
+      document.getElementById('buy').disabled = cart.lines.length === 0;
     }
 
     async function addToCart(productId) {
@@ -106,10 +133,17 @@
       renderCart(await api(`/api/cart/items/${productId}`, { method: 'DELETE' }));
     }
 
+    document.getElementById('buy').onclick = async () => {
+      const order = await api('/api/cart/checkout', { method: 'POST' });
+      renderCart({ lines: [], subtotal: 0, vat: 0, total: 0, currency: order.currency, country: order.country });
+      confirmationEl.textContent =
+        `Order #${order.orderNumber} placed: ${money.format(order.total)} (incl. ${money.format(order.vat)} VAT).`;
+    };
+
     document.getElementById('clear').onclick = async () => renderCart(await api('/api/cart', { method: 'DELETE' }));
 
-    api('/api/products').then(renderProducts);
-    api('/api/cart').then(renderCart);
+    // Load the cart first: it tells us which currency the product prices are in.
+    api('/api/cart').then(renderCart).then(() => api('/api/products')).then(renderProducts);
   </script>
 </body>
 </html>

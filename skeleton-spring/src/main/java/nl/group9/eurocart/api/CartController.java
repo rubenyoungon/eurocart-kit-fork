@@ -1,7 +1,11 @@
 package nl.group9.eurocart.api;
 
+import java.util.Locale;
 import nl.group9.eurocart.cart.CartService;
 import nl.group9.eurocart.cart.CartView;
+import nl.group9.eurocart.cart.Order;
+import nl.group9.eurocart.catalogue.Country;
+import nl.group9.eurocart.currency.Currency;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,23 +26,37 @@ public class CartController {
 	}
 
 	@GetMapping
-	public CartView view() {
-		return cart.view();
+	public CartView view(Locale locale) {
+		return cartFor(locale);
 	}
 
 	@PostMapping("/items")
-	public CartView addItem(@RequestBody AddItemRequest request) {
-		return cart.add(request.productId(), request.quantityOrOne());
+	public CartView addItem(@RequestBody AddItemRequest request,
+			Locale locale) {
+		cart.add(request.productId(), request.quantityOrOne());
+		return cartFor(locale);
 	}
 
 	@DeleteMapping("/items/{productId}")
-	public CartView removeItem(@PathVariable String productId) {
-		return cart.remove(productId);
+	public CartView removeItem(@PathVariable String productId,
+			Locale locale) {
+		cart.remove(productId);
+		return cartFor(locale);
 	}
 
 	@DeleteMapping
-	public CartView clear() {
-		return cart.clear();
+	public CartView clear(Locale locale) {
+		cart.clear();
+		return cartFor(locale);
+	}
+
+	@PostMapping("/checkout")
+	public Order checkout(Locale locale) {
+		return cart.checkout(Currency.forLocale(locale), Country.forLocale(locale));
+	}
+
+	private CartView cartFor(Locale locale) {
+		return cart.view(Currency.forLocale(locale), Country.forLocale(locale));
 	}
 
 }

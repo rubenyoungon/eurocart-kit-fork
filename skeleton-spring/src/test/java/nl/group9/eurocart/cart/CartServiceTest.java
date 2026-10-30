@@ -2,7 +2,9 @@ package nl.group9.eurocart.cart;
 
 import java.math.BigDecimal;
 
+import nl.group9.eurocart.catalogue.Country;
 import nl.group9.eurocart.catalogue.ProductCatalogue;
+import nl.group9.eurocart.currency.Currency;
 
 import org.junit.jupiter.api.Test;
 
@@ -73,6 +75,61 @@ class CartServiceTest {
 	void rejectsQuantityBelowOne() {
 		assertThatThrownBy(() -> cart.add("LAP-001", 0))
 				.isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
+	void checkoutPlacesOrderAndEmptiesCart() {
+		cart.add("BOK-001", 2);
+
+		Order order = cart.checkout();
+
+		assertThat(order.orderNumber()).isEqualTo(1);
+		assertThat(order.lines()).hasSize(1);
+		assertThat(order.subtotal()).isEqualByComparingTo("25.00");
+		assertThat(cart.view().lines()).isEmpty();
+	}
+
+	@Test
+	void checkoutNumbersOrdersConsecutively() {
+		cart.add("BOK-001", 1);
+		cart.checkout();
+		cart.add("BOK-001", 1);
+
+		assertThat(cart.checkout().orderNumber()).isEqualTo(2);
+	}
+
+	@Test
+	void rejectsCheckoutOfEmptyCart() {
+		assertThatThrownBy(cart::checkout)
+				.isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void addsVatPerLineForCustomerCountry() {
+		cart.add("BOK-001", 2); // 25.00 books
+		cart.add("LAP-001", 1); // 899.00 laptop
+
+		CartView nl = cart.view(Currency.EUR, Country.NL); // 9% + 21%
+		assertThat(nl.lines()).extracting(CartLine::vat).containsExactly(new BigDecimal("2.25"),
+				new BigDecimal("188.79"));
+		assertThat(nl.subtotal()).isEqualByComparingTo("924.00");
+		assertThat(nl.vat()).isEqualByComparingTo("191.04");
+		assertThat(nl.total()).isEqualByComparingTo("1115.04");
+
+		CartView de = cart.view(Currency.EUR, Country.DE); // 7% + 19%
+		assertThat(de.vat()).isEqualByComparingTo("172.56");
+		assertThat(de.total()).isEqualByComparingTo("1096.56");
+	}
+
+	@Test
+	void checkoutIncludesVat() {
+		cart.add("FOD-002", 1); // 1.29 food, 0% in GB
+
+		Order order = cart.checkout(Currency.EUR, Country.GB);
+
+		assertThat(order.vat()).isEqualByComparingTo("0.00");
+		assertThat(order.total()).isEqualByComparingTo("1.29");
+		assertThat(order.country()).isEqualTo(Country.GB);
 	}
 
 }

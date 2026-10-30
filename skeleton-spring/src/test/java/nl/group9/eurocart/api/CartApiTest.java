@@ -51,7 +51,28 @@ class CartApiTest {
 				.andExpect(jsonPath("$.lines[0].product.id").value("BOK-001"))
 				.andExpect(jsonPath("$.lines[0].quantity").value(2))
 				.andExpect(jsonPath("$.lines[0].lineTotal").value(25.00))
-				.andExpect(jsonPath("$.subtotal").value(25.00));
+				.andExpect(jsonPath("$.subtotal").value(25.00))
+				.andExpect(jsonPath("$.lines[0].vatRate").value(9))
+				.andExpect(jsonPath("$.vat").value(2.25))
+				.andExpect(jsonPath("$.total").value(27.25))
+				.andExpect(jsonPath("$.country").value("NL"));
+	}
+
+	@Test
+	void vatFollowsCustomerCountryFromLocale() throws Exception {
+		cartService.add("BOK-001", 2);
+
+		mockMvc.perform(get("/api/cart").header("Accept-Language", "de-DE"))
+				.andExpect(jsonPath("$.country").value("DE"))
+				.andExpect(jsonPath("$.vat").value(1.75))
+				.andExpect(jsonPath("$.total").value(26.75));
+
+		mockMvc.perform(get("/api/cart").header("Accept-Language", "pl-PL"))
+				.andExpect(jsonPath("$.country").value("PL"))
+				.andExpect(jsonPath("$.currency").value("PLN"))
+				.andExpect(jsonPath("$.subtotal").value(106.26))
+				.andExpect(jsonPath("$.vat").value(5.31))
+				.andExpect(jsonPath("$.total").value(111.57));
 	}
 
 	@Test
@@ -100,6 +121,29 @@ class CartApiTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"productId\":\"LAP-001\",\"quantity\":0}"))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void checkoutReturnsOrderAndEmptiesCart() throws Exception {
+		cartService.add("BOK-001", 2);
+
+		mockMvc.perform(post("/api/cart/checkout"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.orderNumber").isNumber())
+				.andExpect(jsonPath("$.lines.length()").value(1))
+				.andExpect(jsonPath("$.subtotal").value(25.00))
+				.andExpect(jsonPath("$.vat").value(2.25))
+				.andExpect(jsonPath("$.total").value(27.25));
+
+		mockMvc.perform(get("/api/cart"))
+				.andExpect(jsonPath("$.lines.length()").value(0));
+	}
+
+	@Test
+	void checkoutOfEmptyCartGivesConflictProblem() throws Exception {
+		mockMvc.perform(post("/api/cart/checkout"))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.detail").value("Cart is empty"));
 	}
 
 }

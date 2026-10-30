@@ -1,9 +1,11 @@
 package nl.group9.eurocart.api;
 
 import java.util.List;
+import java.util.Locale;
 
 import nl.group9.eurocart.catalogue.Product;
 import nl.group9.eurocart.catalogue.ProductCatalogue;
+import nl.group9.eurocart.currency.Currency;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,8 +22,8 @@ public class CatalogueController {
 	}
 
 	@GetMapping
-	public List<Product> all() {
-		return catalogue.all();
+	public List<Product> all(Locale locale) {
+		return catalogue.all().stream().map(Currency.forLocale(locale)::convert).toList();
 	}
 
 }
