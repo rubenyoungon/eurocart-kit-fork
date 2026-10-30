@@ -7,8 +7,21 @@
   <style>
     :root { --accent: #1f4fbf; --accent-dark: #173c91; --accent-soft: #e9effb; }
     body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #f6f6f6; color: #222; }
-    h1 { margin: 0 0 1rem; color: var(--accent); }
-    main { max-width: 800px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    h1 { margin: 0; color: var(--accent); }
+    /* Country dropdowns with flags, also in the open list; Windows has no flag emoji, so the flags are SVGs. */
+    .country-picker { position: relative; display: inline-block; }
+    #address .country-picker { display: block; }
+    .picker-button { display: flex; align-items: center; gap: .5rem; width: 100%; font: inherit; padding: .3rem .5rem; border-color: #bbb; background: #fff; color: inherit; text-align: left; }
+    .picker-button::after { content: '▾'; margin-left: auto; padding-left: .5rem; color: #666; }
+    .picker-list { position: absolute; z-index: 10; right: 0; min-width: 100%; max-height: 16rem; overflow-y: auto; margin: .25rem 0 0; padding: .25rem 0; list-style: none; background: #fff; border: 1px solid #bbb; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+    .picker-list li { display: flex; align-items: center; gap: .5rem; padding: .3rem .6rem; cursor: pointer; white-space: nowrap; }
+    .picker-list li.active, .picker-list li:hover { background: var(--accent-soft); color: var(--accent-dark); }
+    .picker-list li[aria-selected="true"] { font-weight: bold; }
+    .flag { display: flex; }
+    .flag svg { width: 1.35em; height: .9em; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.2); }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
     section { background: #fff; border-radius: 8px; border-top: 4px solid var(--accent); padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
     h2 { margin: 0 0 .5rem; font-size: 1.1rem; color: var(--accent-dark); }
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -22,8 +35,10 @@
     .muted { color: #888; font-size: .85rem; }
     #error { color: #b00; min-height: 1.2em; }
     #confirmation { color: #070; }
-    #buy { background: #2a7; border-color: #185; color: #fff; font-weight: bold; font-size: 1.2rem; padding: .6rem 2rem; }
+    #buy { background: #2a7; border-color: #185; color: #fff; font-weight: bold; font-size: 1.2rem; padding: .6rem 2rem; width: 100%; }
     #buy:hover { background: #185; }
+    .add-button { background: var(--accent); border-color: var(--accent-dark); color: #fff; font-weight: bold; padding: .3rem .9rem; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+    .add-button:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
     #buy:disabled { background: #ccc; border-color: #bbb; cursor: default; }
     .category { border: 1px solid #e3e3e3; border-radius: 6px; padding: .5rem .75rem; margin-top: .75rem; }
     .category summary { cursor: pointer; }
@@ -39,128 +54,298 @@
     .product-detail dt { color: #666; }
     .product-detail dd { margin: 0; }
     .product-detail .incl-vat { font-weight: bold; color: var(--accent-dark); }
-    #choose { font-size: 1rem; padding: .4rem 1rem; margin-bottom: 1rem; }
-    #product-dialog { width: min(700px, calc(100% - 2rem)); max-height: 85vh; padding: 0; border: 0; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,.25); }
-    #product-dialog::backdrop { background: rgba(0,0,0,.4); }
-    #product-dialog section { box-shadow: none; }
-    #product-dialog .dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
-    #product-dialog .dialog-actions button { padding: .4rem 1rem; }
-    #add-selected { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
-    #add-selected:hover { background: var(--accent-dark); color: #fff; }
-    #add-selected:disabled { background: #ccc; border-color: #bbb; cursor: default; }
+    .vat-line { display: block; font-size: .75rem; color: #999; }
+    #address h3 { margin-top: 1.25rem; }
+    #address .fields { display: grid; grid-template-columns: max-content 1fr; gap: .4rem .75rem; align-items: center; }
+    #address input, #address select { font: inherit; padding: .3rem .4rem; border: 1px solid #bbb; border-radius: 4px; min-width: 0; }
+    #address input:focus, #address select:focus { border-color: var(--accent); }
   </style>
 </head>
 <body>
-  <h1>EuroCart</h1>
+  <header>
+    <h1>EuroCart</h1>
+    <!-- Same choice as the delivery country in the address form; the two stay in sync. -->
+    <span class="country-picker">
+      <select id="header-country" hidden></select>
+      <button type="button" class="picker-button" id="header-country-button" aria-haspopup="listbox" aria-expanded="false"></button>
+      <ul class="picker-list" role="listbox" tabindex="-1" hidden></ul>
+    </span>
+  </header>
   <p id="error"></p>
-  <p id="confirmation"></p>
-  <button id="choose" data-i18n="chooseProducts">Choose products</button>
-  <dialog id="product-dialog" aria-labelledby="products-heading">
-    <form method="dialog">
-      <section>
-        <h2 id="products-heading" data-i18n="products">Products</h2>
-        <p class="muted" id="products-note"></p>
-        <div id="products"></div>
-        <div class="dialog-actions">
-          <button value="cancel" data-i18n="cancel">Cancel</button>
-          <button value="add" id="add-selected" data-i18n="addToCart" disabled>Add to cart</button>
-        </div>
-      </section>
-    </form>
-  </dialog>
   <main>
-    <!-- The cart stays hidden until products have been picked in the dialog. -->
-    <section id="cart" hidden>
+    <section>
+      <h2 data-i18n="products">Products</h2>
+      <p class="muted" id="products-note"></p>
+      <div id="products"></div>
+    </section>
+    <section>
       <h2 data-i18n="cart">Cart</h2>
       <table>
-        <thead><tr><th data-i18n="product">Product</th><th class="num" data-i18n="priceInclVat">Price incl. VAT</th><th class="num" data-i18n="qty">Qty</th><th class="num" data-i18n="lineTotal">Line total</th><th class="num" data-i18n="vat">VAT</th><th></th></tr></thead>
+        <thead><tr><th data-i18n="product">Product</th><th class="num" data-i18n="qty">Qty</th><th class="num" data-i18n="lineTotal">Line total</th><th></th></tr></thead>
         <tbody id="cart-lines"></tbody>
         <tfoot>
-          <tr><td data-i18n="subtotal">Subtotal (excl. VAT)</td><td></td><td></td><td class="num" id="subtotal"></td><td></td><td></td></tr>
-          <tr><td id="vat-label"></td><td></td><td></td><td class="num" id="vat"></td><td></td><td></td></tr>
-          <tr><td data-i18n="total">Total (incl. VAT)</td><td></td><td></td><td class="num" id="total"></td><td></td><td></td></tr>
+          <tr><td data-i18n="subtotal">Subtotal (excl. VAT)</td><td></td><td class="num" id="subtotal"></td><td></td></tr>
+          <tr><td id="vat-label"></td><td></td><td class="num" id="vat"></td><td></td></tr>
+          <tr><td data-i18n="total">Total (incl. VAT)</td><td></td><td class="num" id="total"></td><td></td></tr>
         </tfoot>
       </table>
-      <p><button id="buy" data-i18n="buy">Buy</button></p>
+      <!-- The delivery country decides currency and VAT: changing it reprices the products and the cart. -->
+      <form id="address">
+        <h3 data-i18n="deliveryAddress">Delivery address</h3>
+        <div class="fields">
+          <label for="address-name" data-i18n="name">Name</label>
+          <input id="address-name" name="name" autocomplete="shipping name" required>
+          <label for="address-street" data-i18n="street">Street and number</label>
+          <input id="address-street" name="street" autocomplete="shipping street-address" required>
+          <label for="address-postal-code" data-i18n="postalCode">Postal code</label>
+          <input id="address-postal-code" name="postalCode" autocomplete="shipping postal-code" required>
+          <label for="address-city" data-i18n="city">City</label>
+          <input id="address-city" name="city" autocomplete="shipping address-level2" required>
+          <label for="address-country-button" data-i18n="country">Country</label>
+          <span class="country-picker">
+            <select id="address-country" name="country" hidden></select>
+            <button type="button" class="picker-button" id="address-country-button" aria-haspopup="listbox" aria-expanded="false"></button>
+            <ul class="picker-list" role="listbox" tabindex="-1" hidden></ul>
+          </span>
+        </div>
+        <p><button id="buy" data-i18n="buy">Buy</button></p>
+      </form>
+      <p id="confirmation"></p>
     </section>
   </main>
 
   <script>
     const messages = {
       en: {
-        products: 'Products', cart: 'Cart', product: 'Product', origin: 'Origin', exclVat: 'Excl. VAT',
+        products: 'Products', cart: 'Cart', product: 'Product', origin: 'Origin', inclVat: 'Incl. VAT',
         priceExclVat: 'Price excl. VAT', priceInclVat: 'Price incl. VAT', qty: 'Qty', lineTotal: 'Line total', vat: 'VAT',
-        subtotal: 'Subtotal (excl. VAT)', total: 'Total (incl. VAT)', buy: 'Buy', addToCart: 'Add to cart', remove: 'Remove',
-        chooseProducts: 'Choose products', cancel: 'Cancel',
-        productCode: 'Product code', vatCountry: 'VAT ({country})', vatRate: 'VAT ({rate}%)',
-        productsNote: 'Prices in {currency}, excluding shipping and VAT. Click a product to see its price including VAT.',
+        subtotal: 'Subtotal (excl. VAT)', total: 'Total (incl. VAT)', buy: 'Buy', add: 'Add', remove: 'Remove',
+        productCode: 'Product code', vatRate: 'VAT ({rate}%)', vatAmount: 'VAT {rate}%: {amount}',
+        productsNote: 'Prices in {currency}, including VAT and excluding shipping. Click a product to see the VAT breakdown.',
+        deliveryAddress: 'Delivery address', name: 'Name', street: 'Street and number', postalCode: 'Postal code', city: 'City', country: 'Country',
         orderPlaced: 'Order #{number} placed: {total} (incl. {vat} VAT).',
         categories: { LAPTOP: 'Laptops', BOOK: 'Books', FOOD: 'Food', MEDICINE: 'Medicine', EBOOK: 'E-books' },
       },
       nl: {
-        products: 'Producten', cart: 'Winkelwagen', product: 'Product', origin: 'Herkomst', exclVat: 'Excl. btw',
+        products: 'Producten', cart: 'Winkelwagen', product: 'Product', origin: 'Herkomst', inclVat: 'Incl. btw',
         priceExclVat: 'Prijs excl. btw', priceInclVat: 'Prijs incl. btw', qty: 'Aantal', lineTotal: 'Regeltotaal', vat: 'Btw',
-        subtotal: 'Subtotaal (excl. btw)', total: 'Totaal (incl. btw)', buy: 'Kopen', addToCart: 'In winkelwagen', remove: 'Verwijderen',
-        chooseProducts: 'Producten kiezen', cancel: 'Annuleren',
-        productCode: 'Productcode', vatCountry: 'Btw ({country})', vatRate: 'Btw ({rate}%)',
-        productsNote: 'Prijzen in {currency}, exclusief verzendkosten en btw. Klik op een product om de prijs inclusief btw te zien.',
+        subtotal: 'Subtotaal (excl. btw)', total: 'Totaal (incl. btw)', buy: 'Kopen', add: 'Toevoegen', remove: 'Verwijderen',
+        productCode: 'Productcode', vatRate: 'Btw ({rate}%)', vatAmount: 'Btw {rate}%: {amount}',
+        productsNote: 'Prijzen in {currency}, inclusief btw en exclusief verzendkosten. Klik op een product om de btw-opbouw te zien.',
+        deliveryAddress: 'Bezorgadres', name: 'Naam', street: 'Straat en huisnummer', postalCode: 'Postcode', city: 'Plaats', country: 'Land',
         orderPlaced: 'Bestelling #{number} geplaatst: {total} (incl. {vat} btw).',
         categories: { LAPTOP: 'Laptops', BOOK: 'Boeken', FOOD: 'Voeding', MEDICINE: 'Medicijnen', EBOOK: 'E-books' },
       },
       pl: {
-        products: 'Produkty', cart: 'Koszyk', product: 'Produkt', origin: 'Pochodzenie', exclVat: 'Netto',
+        products: 'Produkty', cart: 'Koszyk', product: 'Produkt', origin: 'Pochodzenie', inclVat: 'Brutto',
         priceExclVat: 'Cena netto', priceInclVat: 'Cena brutto', qty: 'Ilość', lineTotal: 'Wartość', vat: 'VAT',
-        subtotal: 'Suma netto', total: 'Razem brutto', buy: 'Kup', addToCart: 'Dodaj do koszyka', remove: 'Usuń',
-        chooseProducts: 'Wybierz produkty', cancel: 'Anuluj',
-        productCode: 'Kod produktu', vatCountry: 'VAT ({country})', vatRate: 'VAT ({rate}%)',
-        productsNote: 'Ceny w {currency}, bez kosztów wysyłki i VAT. Kliknij produkt, aby zobaczyć cenę z VAT.',
+        subtotal: 'Suma netto', total: 'Razem brutto', buy: 'Kup', add: 'Dodaj', remove: 'Usuń',
+        productCode: 'Kod produktu', vatRate: 'VAT ({rate}%)', vatAmount: 'VAT {rate}%: {amount}',
+        productsNote: 'Ceny w {currency}, z VAT, bez kosztów wysyłki. Kliknij produkt, aby zobaczyć rozbicie VAT.',
+        deliveryAddress: 'Adres dostawy', name: 'Imię i nazwisko', street: 'Ulica i numer', postalCode: 'Kod pocztowy', city: 'Miejscowość', country: 'Kraj',
         orderPlaced: 'Zamówienie nr {number} złożone: {total} (w tym {vat} VAT).',
         categories: { LAPTOP: 'Laptopy', BOOK: 'Książki', FOOD: 'Żywność', MEDICINE: 'Leki', EBOOK: 'E-booki' },
       },
       de: {
-        products: 'Produkte', cart: 'Warenkorb', product: 'Produkt', origin: 'Herkunft', exclVat: 'Exkl. MwSt.',
+        products: 'Produkte', cart: 'Warenkorb', product: 'Produkt', origin: 'Herkunft', inclVat: 'Inkl. MwSt.',
         priceExclVat: 'Preis exkl. MwSt.', priceInclVat: 'Preis inkl. MwSt.', qty: 'Menge', lineTotal: 'Summe', vat: 'MwSt.',
-        subtotal: 'Zwischensumme (exkl. MwSt.)', total: 'Gesamt (inkl. MwSt.)', buy: 'Kaufen', addToCart: 'In den Warenkorb', remove: 'Entfernen',
-        chooseProducts: 'Produkte auswählen', cancel: 'Abbrechen',
-        productCode: 'Artikelnummer', vatCountry: 'MwSt. ({country})', vatRate: 'MwSt. ({rate} %)',
-        productsNote: 'Preise in {currency}, ohne Versand und MwSt. Klicken Sie auf ein Produkt, um den Preis inkl. MwSt. zu sehen.',
+        subtotal: 'Zwischensumme (exkl. MwSt.)', total: 'Gesamt (inkl. MwSt.)', buy: 'Kaufen', add: 'Hinzufügen', remove: 'Entfernen',
+        productCode: 'Artikelnummer', vatRate: 'MwSt. ({rate} %)', vatAmount: 'MwSt. {rate} %: {amount}',
+        productsNote: 'Preise in {currency}, inkl. MwSt. und zzgl. Versand. Klicken Sie auf ein Produkt, um die MwSt.-Aufschlüsselung zu sehen.',
+        deliveryAddress: 'Lieferadresse', name: 'Name', street: 'Straße und Hausnummer', postalCode: 'Postleitzahl', city: 'Ort', country: 'Land',
         orderPlaced: 'Bestellung Nr. {number} aufgegeben: {total} (inkl. {vat} MwSt.).',
         categories: { LAPTOP: 'Laptops', BOOK: 'Bücher', FOOD: 'Lebensmittel', MEDICINE: 'Medikamente', EBOOK: 'E-Books' },
       },
       fr: {
-        products: 'Produits', cart: 'Panier', product: 'Produit', origin: 'Origine', exclVat: 'HT',
+        products: 'Produits', cart: 'Panier', product: 'Produit', origin: 'Origine', inclVat: 'TTC',
         priceExclVat: 'Prix HT', priceInclVat: 'Prix TTC', qty: 'Qté', lineTotal: 'Total ligne', vat: 'TVA',
-        subtotal: 'Sous-total HT', total: 'Total TTC', buy: 'Acheter', addToCart: 'Ajouter au panier', remove: 'Retirer',
-        chooseProducts: 'Choisir des produits', cancel: 'Annuler',
-        productCode: 'Référence', vatCountry: 'TVA ({country})', vatRate: 'TVA ({rate} %)',
-        productsNote: 'Prix en {currency}, hors frais de port et hors TVA. Cliquez sur un produit pour voir son prix TTC.',
+        subtotal: 'Sous-total HT', total: 'Total TTC', buy: 'Acheter', add: 'Ajouter', remove: 'Retirer',
+        productCode: 'Référence', vatRate: 'TVA ({rate} %)', vatAmount: 'TVA {rate} % : {amount}',
+        productsNote: 'Prix en {currency}, TTC et hors frais de port. Cliquez sur un produit pour voir le détail de la TVA.',
+        deliveryAddress: 'Adresse de livraison', name: 'Nom', street: 'Rue et numéro', postalCode: 'Code postal', city: 'Ville', country: 'Pays',
         orderPlaced: 'Commande n° {number} passée : {total} (dont {vat} de TVA).',
         categories: { LAPTOP: 'Ordinateurs portables', BOOK: 'Livres', FOOD: 'Alimentation', MEDICINE: 'Médicaments', EBOOK: 'Livres numériques' },
       },
     };
     const defaultLocales = { en: 'en-GB', nl: 'nl-NL', pl: 'pl-PL', de: 'de-DE', fr: 'fr-FR' };
 
-    // On /pl the shop acts as if the customer is in Poland (PLN, Polish VAT, Polish texts), whatever the browser language.
-    const forcePoland = /^\/pl\/?$/.test(location.pathname);
-    const headers = { 'Content-Type': 'application/json' };
-    if (forcePoland) {
-      headers['Accept-Language'] = 'pl-PL';
-    }
+    // On /pl, /de and /fr the shop acts as if the customer is in that country (its currency, VAT and texts),
+    // whatever the browser language.
+    const countryPages = { pl: 'pl-PL', de: 'de-DE', fr: 'fr-FR' };
+    const forcedLocale = countryPages[(location.pathname.match(/^\/(\w+)\/?$/) || [])[1]];
 
     // Texts follow the first browser language we have translations for; the browser's own locale (fr-CH, de-AT)
     // is kept for number formatting when it matches that language.
-    const browserLocale = forcePoland ? 'pl-PL'
-      : (navigator.languages || [navigator.language]).find(l => messages[l.split('-')[0].toLowerCase()]) || 'en-GB';
-    const lang = browserLocale.split('-')[0].toLowerCase();
-    const locale = browserLocale.includes('-') ? browserLocale : defaultLocales[lang];
-    document.documentElement.lang = lang;
+    const browserLocale = forcedLocale
+      || (navigator.languages || [navigator.language]).find(l => messages[l.split('-')[0].toLowerCase()]) || 'en-GB';
+    // Picking a country switches both to that country's (see useLanguage).
+    let lang = browserLocale.split('-')[0].toLowerCase();
+    let locale = browserLocale.includes('-') ? browserLocale : defaultLocales[lang];
+
+    // Without a delivery country the server picks currency and VAT country from Accept-Language. Send the locale
+    // chosen above instead of the browser's raw list, so texts, currency and VAT start from the same locale
+    // (es-ES, pl-PL → Polish and PLN).
+    const headers = { 'Content-Type': 'application/json', 'Accept-Language': locale };
+
+    // The language a picked country switches the texts to. Switzerland has several; German is the most spoken.
+    const countryLocales = { NL: 'nl-NL', DE: 'de-DE', FR: 'fr-FR', PL: 'pl-PL', CH: 'de-CH', GB: 'en-GB' };
+
+    // The delivery country picked in the address form; null until the customer picks one, so the server uses the
+    // locale's country. Once set, it is sent with every request so currency and VAT follow it.
+    let deliveryCountry = null;
+    const countries = ['NL', 'DE', 'FR', 'PL', 'CH', 'GB'];
+
+    function withCountry(path) {
+      return deliveryCountry ? `${path}?country=${deliveryCountry}` : path;
+    }
 
     function t(key, params = {}) {
       return messages[lang][key].replace(/\{(\w+)\}/g, (_, name) => params[name]);
     }
 
-    for (const el of document.querySelectorAll('[data-i18n]')) {
-      el.textContent = t(el.dataset.i18n);
+    // The country selector top right and the one in the address form both set the delivery country.
+    const countrySelects = [document.getElementById('header-country'), document.getElementById('address-country')];
+    let countryNames;
+
+    // Simplified flags, drawn as SVG because Windows shows flag emoji as two letters.
+    const stripes = (colors, vertical) => colors.map((color, i) => vertical
+      ? `<rect x="${i * 3}" width="3" height="6" fill="${color}"/>`
+      : `<rect y="${i * 6 / colors.length}" width="9" height="${6 / colors.length}" fill="${color}"/>`).join('');
+    const flags = {
+      NL: `<svg viewBox="0 0 9 6">${stripes(['#ae1c28', '#fff', '#21468b'])}</svg>`,
+      DE: `<svg viewBox="0 0 9 6">${stripes(['#000', '#dd0000', '#ffce00'])}</svg>`,
+      FR: `<svg viewBox="0 0 9 6">${stripes(['#002654', '#fff', '#ed2939'], true)}</svg>`,
+      PL: `<svg viewBox="0 0 9 6">${stripes(['#fff', '#dc143c'])}</svg>`,
+      CH: '<svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#d52b1e"/>'
+        + '<rect x="13" y="4" width="4" height="12" fill="#fff"/><rect x="9" y="8" width="12" height="4" fill="#fff"/></svg>',
+      GB: '<svg viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice"><rect width="60" height="30" fill="#012169"/>'
+        + '<path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/>'
+        + '<path d="M0,0 L60,30 M60,0 L0,30" stroke="#c8102e" stroke-width="2"/>'
+        + '<path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/>'
+        + '<path d="M30,0 v30 M0,15 h60" stroke="#c8102e" stroke-width="6"/></svg>',
+    };
+
+    function flagElement(code) {
+      const flag = document.createElement('span');
+      flag.className = 'flag';
+      flag.setAttribute('aria-hidden', 'true');
+      flag.innerHTML = flags[code] || '';
+      return flag;
+    }
+
+    // Each country select is hidden behind a custom dropdown, so the open list can show flags too. The <select>
+    // keeps the value, the change events and the form field; the dropdown only shows and sets it.
+    function renderPicker(select) {
+      const picker = select.closest('.country-picker');
+      const button = picker.querySelector('.picker-button');
+      const list = picker.querySelector('.picker-list');
+      const selected = select.selectedOptions[0];
+      button.replaceChildren(flagElement(select.value), selected ? selected.text : '');
+      button.setAttribute('aria-label', `${t('country')}: ${selected ? selected.text : ''}`);
+      list.setAttribute('aria-label', t('country'));
+      list.replaceChildren(...[...select.options].map(option => {
+        const item = document.createElement('li');
+        item.id = `${select.id}-${option.value}`;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', String(option.selected));
+        item.append(flagElement(option.value), option.text);
+        return item;
+      }));
+    }
+
+    function setUpPicker(select) {
+      const picker = select.closest('.country-picker');
+      const button = picker.querySelector('.picker-button');
+      const list = picker.querySelector('.picker-list');
+      let active = 0;
+
+      function open() {
+        renderPicker(select);
+        list.hidden = false;
+        button.setAttribute('aria-expanded', 'true');
+        setActive(Math.max(select.selectedIndex, 0));
+        list.focus();
+      }
+      function close(focusButton) {
+        list.hidden = true;
+        button.setAttribute('aria-expanded', 'false');
+        if (focusButton) button.focus();
+      }
+      function setActive(index) {
+        const items = [...list.children];
+        active = Math.max(0, Math.min(items.length - 1, index));
+        items.forEach((item, i) => item.classList.toggle('active', i === active));
+        list.setAttribute('aria-activedescendant', items[active].id);
+        items[active].scrollIntoView({ block: 'nearest' });
+      }
+      function choose(index) {
+        close(true);
+        if (select.selectedIndex !== index) {
+          select.selectedIndex = index;
+          select.dispatchEvent(new Event('change'));
+        }
+      }
+
+      button.onclick = () => list.hidden ? open() : close(false);
+      button.onkeydown = event => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          open();
+        }
+      };
+      list.onkeydown = event => {
+        const moves = { ArrowDown: active + 1, ArrowUp: active - 1, Home: 0, End: list.children.length - 1 };
+        if (event.key in moves) {
+          event.preventDefault();
+          setActive(moves[event.key]);
+        } else if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          choose(active);
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          close(true);
+        } else if (event.key === 'Tab') {
+          close(false);
+        }
+      };
+      list.onclick = event => {
+        const item = event.target.closest('[role="option"]');
+        if (item) choose([...list.children].indexOf(item));
+      };
+      // A click or tab anywhere outside the dropdown closes it.
+      list.addEventListener('focusout', event => {
+        if (!picker.contains(event.relatedTarget)) close(false);
+      });
+    }
+    countrySelects.forEach(setUpPicker);
+
+    // The selector top right names each country in its own language (Deutschland, Polska), so customers find theirs
+    // whatever language the page is in; the address form uses the page language.
+    const ownCountryNames = Object.fromEntries(countries.map(code =>
+      [code, new Intl.DisplayNames([countryLocales[code]], { type: 'region' }).of(code)]));
+
+    // Puts the static texts and the country names in the current language.
+    function translatePage() {
+      document.documentElement.lang = lang;
+      for (const el of document.querySelectorAll('[data-i18n]')) {
+        el.textContent = t(el.dataset.i18n);
+      }
+      countryNames = new Intl.DisplayNames([locale], { type: 'region' });
+      for (const select of countrySelects) {
+        const name = select.id === 'header-country' ? code => ownCountryNames[code] : code => countryNames.of(code);
+        const selected = select.value;
+        select.replaceChildren(...countries.map(code => new Option(name(code), code)));
+        select.value = selected;
+        renderPicker(select);
+      }
+    }
+    translatePage();
+
+    function useLanguage(country) {
+      locale = countryLocales[country];
+      lang = locale.split('-')[0];
+      headers['Accept-Language'] = locale;
+      translatePage();
     }
 
     // The server picks the currency from the customer's location; we show whatever the cart is priced in.
@@ -190,19 +375,21 @@
       return body;
     }
 
-    function selectBox(product) {
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.name = 'product';
-      checkbox.value = product.id;
-      checkbox.setAttribute('aria-label', product.name);
-      return checkbox;
+    function addButton(productId) {
+      const button = document.createElement('button');
+      button.className = 'add-button';
+      button.textContent = t('add');
+      button.onclick = () => addToCart(productId);
+      return button;
     }
 
     function renderProducts(products) {
       const container = document.getElementById('products');
       container.innerHTML = '';
-      for (const [category, items] of Map.groupBy(products, p => p.category)) {
+      // E-books come first; the other categories keep the catalogue's order.
+      const groups = [...Map.groupBy(products, p => p.category)];
+      groups.sort(([a], [b]) => (b === 'EBOOK') - (a === 'EBOOK'));
+      for (const [category, items] of groups) {
         container.appendChild(renderCategory(category, items));
       }
     }
@@ -221,26 +408,24 @@
       container.appendChild(collapsible);
       const table = document.createElement('table');
       table.createTHead().innerHTML =
-        `<tr><th>${t('product')}</th><th>${t('origin')}</th><th class="num">${t('exclVat')}</th><th></th></tr>`;
+        `<tr><th>${t('product')}</th><th class="num">${t('inclVat')}</th><th></th></tr>`;
       for (const p of items) {
         const row = table.insertRow();
-        // A click on the product name unfolds its details, including the price incl. VAT, in the row below.
+        // A click on the product name unfolds its details, including origin and the VAT breakdown, in the row below.
         const toggle = document.createElement('button');
-        toggle.type = 'button'; // the list sits in the dialog's form; a plain button would submit and close it
         toggle.className = 'product-toggle';
         toggle.textContent = p.name;
         toggle.setAttribute('aria-expanded', 'false');
         row.insertCell().appendChild(toggle);
-        row.insertCell().innerHTML = `<span class="muted">${p.countryOfOrigin}</span>`;
-        const price = row.insertCell(); price.className = 'num'; price.textContent = money.format(p.price);
+        const price = row.insertCell(); price.className = 'num'; price.textContent = money.format(p.priceInclVat);
         const action = row.insertCell(); action.className = 'num';
-        action.appendChild(selectBox(p));
+        action.appendChild(addButton(p.id));
 
         const detailRow = table.insertRow();
         detailRow.className = 'product-detail';
         detailRow.hidden = true;
         const cell = detailRow.insertCell();
-        cell.colSpan = 4;
+        cell.colSpan = 3;
         cell.appendChild(renderProductDetail(p));
         toggle.onclick = () => {
           detailRow.hidden = !detailRow.hidden;
@@ -255,6 +440,7 @@
       const details = document.createElement('dl');
       for (const [label, value, className] of [
         [t('productCode'), p.id],
+        [t('origin'), countryNames.of(p.countryOfOrigin)],
         [t('priceExclVat'), money.format(p.price)],
         [t('vatRate', { rate: p.vatRate }), money.format(p.priceInclVat - p.price)],
         [t('priceInclVat'), money.format(p.priceInclVat), 'incl-vat'],
@@ -273,11 +459,15 @@
       tbody.innerHTML = '';
       for (const line of cart.lines) {
         const row = tbody.insertRow();
-        row.insertCell().textContent = line.product.name;
-        const price = row.insertCell(); price.className = 'num'; price.textContent = money.format(line.priceInclVat);
+        // The line's VAT amount and rate sit in small grey text below the product name.
+        const name = row.insertCell();
+        const vatLine = document.createElement('span');
+        vatLine.className = 'vat-line';
+        vatLine.textContent = t('vatAmount', { rate: line.vatRate, amount: money.format(line.vat) });
+        name.append(line.product.name, vatLine);
         const qty = row.insertCell(); qty.className = 'num'; qty.textContent = line.quantity;
-        const total = row.insertCell(); total.className = 'num'; total.textContent = money.format(line.lineTotal);
-        const vat = row.insertCell(); vat.className = 'num muted'; vat.textContent = `${line.vatRate}%`;
+        // lineTotal from the server excludes VAT.
+        const total = row.insertCell(); total.className = 'num'; total.textContent = money.format(line.lineTotal + line.vat);
         const action = row.insertCell(); action.className = 'num';
         const button = document.createElement('button');
         button.textContent = t('remove');
@@ -286,56 +476,54 @@
       }
       document.getElementById('subtotal').textContent = money.format(cart.subtotal);
       document.getElementById('vat').textContent = money.format(cart.vat);
-      document.getElementById('vat-label').textContent = t('vatCountry', { country: cart.country });
+      // VAT can mix countries (e-books are taxed in the delivery country, the rest in the shop's), so the label names none.
+      document.getElementById('vat-label').textContent = t('vat');
       document.getElementById('total').textContent = money.format(cart.total);
       document.getElementById('buy').disabled = cart.lines.length === 0;
-      document.getElementById('cart').hidden = cart.lines.length === 0;
-    }
-
-    async function addToCart(productIds) {
-      let cart;
-      for (const productId of productIds) {
-        cart = await api('/api/cart/items', { method: 'POST', body: JSON.stringify({ productId, quantity: 1 }) });
+      // Until the customer picks a delivery country, the selectors show the one the server took from the locale.
+      for (const select of countrySelects) {
+        select.value = cart.country;
+        renderPicker(select);
       }
-      renderCart(cart);
     }
 
-    // Products are picked with checkboxes in the dialog and only added to the cart on "Add to cart".
-    const dialog = document.getElementById('product-dialog');
-    const productForm = dialog.querySelector('form');
-    const addSelectedButton = document.getElementById('add-selected');
-
-    function selectedProductIds() {
-      return [...productForm.querySelectorAll('input[name="product"]:checked')].map(box => box.value);
+    async function addToCart(productId) {
+      renderCart(await api(withCountry('/api/cart/items'),
+        { method: 'POST', body: JSON.stringify({ productId, quantity: 1 }) }));
     }
-
-    document.getElementById('choose').onclick = () => {
-      productForm.reset();
-      addSelectedButton.disabled = true;
-      dialog.returnValue = ''; // Escape keeps the previous returnValue, which must not count as "add"
-      dialog.showModal();
-    };
-    productForm.onchange = () => { addSelectedButton.disabled = selectedProductIds().length === 0; };
-    dialog.onclose = () => {
-      if (dialog.returnValue === 'add') {
-        addToCart(selectedProductIds());
-      }
-    };
 
     async function removeFromCart(productId) {
-      renderCart(await api(`/api/cart/items/${productId}`, { method: 'DELETE' }));
+      renderCart(await api(withCountry(`/api/cart/items/${productId}`), { method: 'DELETE' }));
     }
 
-    document.getElementById('buy').onclick = async () => {
-      const order = await api('/api/cart/checkout', { method: 'POST' });
+    // Load the cart first: it tells us which currency the product prices are in.
+    async function loadShop() {
+      renderCart(await api(withCountry('/api/cart')));
+      renderProducts(await api(withCountry('/api/products')));
+    }
+
+    const addressForm = document.getElementById('address');
+    // Picking a country sets the delivery country (currency and VAT) and switches the texts to its language.
+    for (const select of countrySelects) {
+      select.onchange = () => {
+        deliveryCountry = select.value;
+        renderPicker(select);
+        useLanguage(deliveryCountry);
+        loadShop();
+      };
+    }
+
+    // "Buy" submits the address form, so the browser makes sure all address fields are filled in first.
+    addressForm.onsubmit = async event => {
+      event.preventDefault();
+      const address = Object.fromEntries(new FormData(addressForm));
+      const order = await api('/api/cart/checkout', { method: 'POST', body: JSON.stringify(address) });
       renderCart({ lines: [], subtotal: 0, vat: 0, total: 0, currency: order.currency, country: order.country });
       confirmationEl.textContent =
         t('orderPlaced', { number: order.orderNumber, total: money.format(order.total), vat: money.format(order.vat) });
     };
 
-
-    // Load the cart first: it tells us which currency the product prices are in.
-    api('/api/cart').then(renderCart).then(() => api('/api/products')).then(renderProducts);
+    loadShop();
   </script>
 </body>
 </html>

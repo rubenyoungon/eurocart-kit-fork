@@ -25,6 +25,13 @@ class VatRatesTest {
 		assertThat(VatRates.percentage(country, category)).isEqualByComparingTo(expected);
 	}
 
+	@ParameterizedTest
+	@CsvSource({ "DE, EBOOK, 19", "PL, EBOOK, 23", "NL, EBOOK, 21", "DE, BOOK, 9", "GB, FOOD, 9", "PL, LAPTOP, 21" })
+	void forDeliveryTaxesEbooksInDeliveryCountryAndTheRestInShopCountry(Country deliveryCountry, Category category,
+			BigDecimal expected) {
+		assertThat(VatRates.forDelivery(deliveryCountry, category)).isEqualByComparingTo(expected);
+	}
+
 	@Test
 	void vatIsRoundedHalfUpToCents() {
 		assertThat(VatRates.vatOn(new BigDecimal("1.29"), new BigDecimal("9"))).isEqualByComparingTo("0.12");

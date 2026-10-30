@@ -51,7 +51,18 @@ public final class VatRates {
 					Category.FOOD, BigDecimal.ZERO,
 					Category.BOOK, BigDecimal.ZERO)));
 
+	/** The country the shop is established in. */
+	public static final Country SHOP_COUNTRY = Country.NL;
+
 	private VatRates() {
+	}
+
+	/**
+	 * The VAT percentage on {@code category} for an order delivered to {@code deliveryCountry}. E-books are
+	 * taxed in the delivery country; everything else at the rates of the {@link #SHOP_COUNTRY shop's country}.
+	 */
+	public static BigDecimal forDelivery(Country deliveryCountry, Category category) {
+		return percentage(category == Category.EBOOK ? deliveryCountry : SHOP_COUNTRY, category);
 	}
 
 	/** The VAT percentage (e.g. {@code 21} for 21%) a customer in {@code country} pays on {@code category}. */

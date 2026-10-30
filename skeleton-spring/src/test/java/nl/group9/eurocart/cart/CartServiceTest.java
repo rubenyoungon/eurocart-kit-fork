@@ -105,7 +105,7 @@ class CartServiceTest {
 	}
 
 	@Test
-	void addsVatPerLineForCustomerCountry() {
+	void addsVatPerLineAtShopCountryRates() {
 		cart.add("BOK-001", 2); // 25.00 books
 		cart.add("LAP-001", 1); // 899.00 laptop
 
@@ -116,19 +116,19 @@ class CartServiceTest {
 		assertThat(nl.vat()).isEqualByComparingTo("191.04");
 		assertThat(nl.total()).isEqualByComparingTo("1115.04");
 
-		CartView de = cart.view(Currency.EUR, Country.DE); // 7% + 19%
-		assertThat(de.vat()).isEqualByComparingTo("172.56");
-		assertThat(de.total()).isEqualByComparingTo("1096.56");
+		CartView de = cart.view(Currency.EUR, Country.DE); // still NL rates: only e-books follow the customer
+		assertThat(de.vat()).isEqualByComparingTo("191.04");
+		assertThat(de.total()).isEqualByComparingTo("1115.04");
 	}
 
 	@Test
 	void checkoutIncludesVat() {
-		cart.add("FOD-002", 1); // 1.29 food, 0% in GB
+		cart.add("EBK-001", 1); // 8.99 e-book, 20% in GB
 
 		Order order = cart.checkout(Currency.EUR, Country.GB);
 
-		assertThat(order.vat()).isEqualByComparingTo("0.00");
-		assertThat(order.total()).isEqualByComparingTo("1.29");
+		assertThat(order.vat()).isEqualByComparingTo("1.80");
+		assertThat(order.total()).isEqualByComparingTo("10.79");
 		assertThat(order.country()).isEqualTo(Country.GB);
 	}
 

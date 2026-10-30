@@ -4,6 +4,8 @@ import nl.group9.eurocart.cart.CartService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,20 +45,23 @@ class CartApiTest {
 	}
 
 	@Test
-	void productsShowPriceInclVatForCustomerCountry() throws Exception {
+	void productsShowPriceInclVatOfShopCountryExceptEbooks() throws Exception {
 		mockMvc.perform(get("/api/products").header("Accept-Language", "nl-NL"))
 				.andExpect(jsonPath("$[?(@.id == 'LAP-001')].vatRate").value(21))
 				.andExpect(jsonPath("$[?(@.id == 'LAP-001')].priceInclVat").value(1087.79))
 				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].priceInclVat").value(13.63));
 
 		mockMvc.perform(get("/api/products").header("Accept-Language", "de-CH"))
-				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].vatRate").value(2.6))
-				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].priceInclVat").value(12.83));
+				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].price").value(11.47))
+				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].vatRate").value(9))
+				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].priceInclVat").value(12.50))
+				.andExpect(jsonPath("$[?(@.id == 'EBK-001')].vatRate").value(8.1));
 	}
 
-	@Test
-	void polishShopPageServesTheFrontEnd() throws Exception {
-		mockMvc.perform(get("/pl"))
+	@ParameterizedTest
+	@ValueSource(strings = { "/pl", "/pl/", "/de", "/de/", "/fr", "/fr/" })
+	void countryShopPagesServeTheFrontEnd(String path) throws Exception {
+		mockMvc.perform(get(path))
 				.andExpect(status().isOk())
 				.andExpect(forwardedUrl("/index.html"));
 	}
@@ -80,20 +85,87 @@ class CartApiTest {
 	}
 
 	@Test
-	void vatFollowsCustomerCountryFromLocale() throws Exception {
+	void nonEbooksPayShopCountryVatWhateverTheLocale() throws Exception {
 		cartService.add("BOK-001", 2);
 
 		mockMvc.perform(get("/api/cart").header("Accept-Language", "de-DE"))
 				.andExpect(jsonPath("$.country").value("DE"))
-				.andExpect(jsonPath("$.vat").value(1.75))
-				.andExpect(jsonPath("$.total").value(26.75));
+				.andExpect(jsonPath("$.lines[0].vatRate").value(9))
+				.andExpect(jsonPath("$.vat").value(2.25))
+				.andExpect(jsonPath("$.total").value(27.25));
 
 		mockMvc.perform(get("/api/cart").header("Accept-Language", "pl-PL"))
 				.andExpect(jsonPath("$.country").value("PL"))
 				.andExpect(jsonPath("$.currency").value("PLN"))
-				.andExpect(jsonPath("$.subtotal").value(106.26))
-				.andExpect(jsonPath("$.vat").value(5.31))
-				.andExpect(jsonPath("$.total").value(111.57));
+				.andExpect(jsonPath("$.subtotal").value(108.70))
+				.andExpect(jsonPath("$.vat").value(9.78))
+				.andExpect(jsonPath("$.total").value(118.48));
+	}
+
+	@Test
+	void ebooksPayVatOfDeliveryCountry() throws Exception {
+		cartService.add("EBK-001", 1);
+
+		mockMvc.perform(get("/api/cart").header("Accept-Language", "de-DE"))
+				.andExpect(jsonPath("$.lines[0].vatRate").value(19))
+				.andExpect(jsonPath("$.vat").value(1.71));
+
+		mockMvc.perform(get("/api/cart").param("country", "PL"))
+				.andExpect(jsonPath("$.lines[0].vatRate").value(23))
+				.andExpect(jsonPath("$.subtotal").value(39.09))
+				.andExpect(jsonPath("$.vat").value(8.99));
+	}
+
+	@Test
+	void deliveryCountryOverridesLocaleForCurrencyAndVat() throws Exception {
+		cartService.add("BOK-001", 2);
+
+		mockMvc.perform(get("/api/cart").param("country", "PL").header("Accept-Language", "de-DE"))
+				.andExpect(jsonPath("$.country").value("PL"))
+				.andExpect(jsonPath("$.currency").value("PLN"))
+				.andExpect(jsonPath("$.subtotal").value(108.70))
+				.andExpect(jsonPath("$.vat").value(9.78));
+
+		mockMvc.perform(get("/api/products").param("country", "GB").header("Accept-Language", "nl-NL"))
+				.andExpect(jsonPath("$[?(@.id == 'BOK-001')].vatRate").value(9))
+				.andExpect(jsonPath("$[?(@.id == 'EBK-001')].vatRate").value(20));
+	}
+
+	@Test
+	void unknownDeliveryCountryGivesBadRequest() throws Exception {
+		mockMvc.perform(get("/api/cart").param("country", "XX"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void checkoutWithAddressUsesItsCountry() throws Exception {
+		cartService.add("BOK-001", 2);
+
+		mockMvc.perform(post("/api/cart/checkout")
+				.header("Accept-Language", "nl-NL")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"name":"Jan Kowalski","street":"ul. Długa 1","postalCode":"00-001",
+						 "city":"Warszawa","country":"PL"}"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.country").value("PL"))
+				.andExpect(jsonPath("$.currency").value("PLN"))
+				.andExpect(jsonPath("$.total").value(118.48))
+				.andExpect(jsonPath("$.address.city").value("Warszawa"));
+	}
+
+	@Test
+	void checkoutWithIncompleteAddressGivesBadRequestAndKeepsCart() throws Exception {
+		cartService.add("BOK-001", 1);
+
+		mockMvc.perform(post("/api/cart/checkout")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"name\":\"Jan\",\"street\":\" \",\"postalCode\":\"1234 AB\",\"city\":\"Utrecht\",\"country\":\"NL\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("Address is missing street"));
+
+		mockMvc.perform(get("/api/cart"))
+				.andExpect(jsonPath("$.lines.length()").value(1));
 	}
 
 	@Test

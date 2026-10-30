@@ -13,4 +13,16 @@ public class ShopPageController {
 		return "forward:/index.html";
 	}
 
+	/** The shop as a customer in Germany sees it: prices in EUR with German VAT. */
+	@GetMapping({ "/de", "/de/" })
+	public String germany() {
+		return "forward:/index.html";
+	}
+
+	/** The shop as a customer in France sees it: prices in EUR with French VAT. */
+	@GetMapping({ "/fr", "/fr/" })
+	public String france() {
+		return "forward:/index.html";
+	}
+
 }

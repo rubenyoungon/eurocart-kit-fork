@@ -9,6 +9,7 @@ import nl.group9.eurocart.currency.Currency;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,10 +22,12 @@ public class CatalogueController {
 		this.catalogue = catalogue;
 	}
 
+	/** All products, priced for the {@code country} parameter (the delivery country), else the locale's country. */
 	@GetMapping
-	public List<ProductView> all(Locale locale) {
-		Currency currency = Currency.forLocale(locale);
-		Country country = Country.forLocale(locale);
+	public List<ProductView> all(@RequestParam(name = "country", required = false) Country deliveryCountry,
+			Locale locale) {
+		Country country = deliveryCountry != null ? deliveryCountry : Country.forLocale(locale);
+		Currency currency = Currency.forCountry(country);
 		return catalogue.all().stream().map(product -> ProductView.of(currency.convert(product), country)).toList();
 	}
 

@@ -58,13 +58,26 @@ public class CartService {
 	 * {@code country}, and empties it.
 	 */
 	public synchronized Order checkout(Currency currency, Country country) {
+		return checkout(currency, country, null);
+	}
+
+	/**
+	 * Places an order for everything in the cart, delivered to {@code address}, and empties it. The currency and
+	 * VAT follow the address's country.
+	 */
+	public synchronized Order checkout(ShippingAddress address) {
+		address.requireComplete();
+		return checkout(Currency.forCountry(address.country()), address.country(), address);
+	}
+
+	private Order checkout(Currency currency, Country country, ShippingAddress address) {
 		if (quantitiesByProductId.isEmpty()) {
 			throw new IllegalStateException("Cart is empty");
 		}
 		CartView view = view(currency, country);
 		quantitiesByProductId.clear();
 		return new Order(++lastOrderNumber, view.lines(), view.subtotal(), view.vat(), view.total(), currency,
-				country);
+				country, address);
 	}
 
 	public synchronized CartView view() {

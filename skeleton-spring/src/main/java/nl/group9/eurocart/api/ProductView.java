@@ -18,7 +18,7 @@ public record ProductView(
 		BigDecimal priceInclVat) {
 
 	public static ProductView of(Product product, Country country) {
-		BigDecimal vatRate = VatRates.percentage(country, product.category());
+		BigDecimal vatRate = VatRates.forDelivery(country, product.category());
 		return new ProductView(product.id(), product.name(), product.category(), product.price(),
 				product.countryOfOrigin(), vatRate, product.price().add(VatRates.vatOn(product.price(), vatRate)));
 	}
