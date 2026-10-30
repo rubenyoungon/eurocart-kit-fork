@@ -17,19 +17,19 @@ class ProductCatalogueTest {
 	private final ProductCatalogue catalogue = new ProductCatalogue(new ObjectMapper());
 
 	@Test
-	void containsFiftyProductsWithUniqueIds() {
+	void containsFiftyOneProductsWithUniqueIds() {
 		List<Product> products = catalogue.all();
 
-		assertThat(products).hasSize(50);
+		assertThat(products).hasSize(51);
 		assertThat(products).extracting(Product::id).doesNotHaveDuplicates();
 	}
 
 	@Test
-	void hasTenProductsPerCategory() {
+	void hasTenProductsPerCategoryPlusTheFluteSheetMusic() {
 		for (Category category : Category.values()) {
 			assertThat(catalogue.all()).filteredOn(p -> p.category() == category)
 					.as("products in category %s", category)
-					.hasSize(10);
+					.hasSize(category == Category.BOOK ? 11 : 10);
 		}
 	}
 

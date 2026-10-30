@@ -13,3 +13,13 @@ Requires Java 21 or newer. Nothing else to install.
 ```
 
 On Windows use `mvnw.cmd`. 
+
+## Data
+
+Both files live in `src/main/resources/` and are plain JSON, so you can also use them without this skeleton.
+
+- `catalogue.json`: 51 products, prices in EUR excluding VAT.
+- `discount.json`: 50 discount codes as issued by Sales. Types are `PERCENTAGE`, `FIXED_AMOUNT` (with
+  `currency`) and `FREE_SHIPPING`. Optional fields: `categories`, `countries`, `validFrom`, `validUntil`
+  and `minimumOrder`; a missing field means no restriction. Whether every code is actually allowed is
+  something to ask the experts. The skeleton does not load this file yet.
