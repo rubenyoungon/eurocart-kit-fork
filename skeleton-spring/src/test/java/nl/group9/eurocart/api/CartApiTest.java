@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -54,6 +55,13 @@ class CartApiTest {
 	}
 
 	@Test
+	void polishShopPageServesTheFrontEnd() throws Exception {
+		mockMvc.perform(get("/pl"))
+				.andExpect(status().isOk())
+				.andExpect(forwardedUrl("/index.html"));
+	}
+
+	@Test
 	void addsItemAndReturnsCartWithSubtotal() throws Exception {
 		mockMvc.perform(post("/api/cart/items")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -65,6 +73,7 @@ class CartApiTest {
 				.andExpect(jsonPath("$.lines[0].lineTotal").value(25.00))
 				.andExpect(jsonPath("$.subtotal").value(25.00))
 				.andExpect(jsonPath("$.lines[0].vatRate").value(9))
+				.andExpect(jsonPath("$.lines[0].priceInclVat").value(13.63))
 				.andExpect(jsonPath("$.vat").value(2.25))
 				.andExpect(jsonPath("$.total").value(27.25))
 				.andExpect(jsonPath("$.country").value("NL"));

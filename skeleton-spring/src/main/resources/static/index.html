@@ -5,25 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EuroCart</title>
   <style>
+    :root { --accent: #1f4fbf; --accent-dark: #173c91; --accent-soft: #e9effb; }
     body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #f6f6f6; color: #222; }
-    h1 { margin: 0 0 1rem; }
+    h1 { margin: 0 0 1rem; color: var(--accent); }
     main { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
-    section { background: #fff; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-    h2 { margin: 0 0 .5rem; font-size: 1.1rem; }
+    section { background: #fff; border-radius: 8px; border-top: 4px solid var(--accent); padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    h2 { margin: 0 0 .5rem; font-size: 1.1rem; color: var(--accent-dark); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     h3 { margin: 1rem 0 .25rem; font-size: .9rem; text-transform: uppercase; color: #666; }
     table { width: 100%; border-collapse: collapse; }
     td, th { padding: .3rem .4rem; text-align: left; border-bottom: 1px solid #eee; }
     td.num, th.num { text-align: right; white-space: nowrap; }
     button { cursor: pointer; border: 1px solid #999; background: #fafafa; border-radius: 4px; padding: .15rem .5rem; }
-    button:hover { background: #eee; }
+    button:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-dark); }
     tfoot td { font-weight: bold; border-top: 2px solid #ccc; }
     .muted { color: #888; font-size: .85rem; }
     #error { color: #b00; min-height: 1.2em; }
     #confirmation { color: #070; }
-    #buy { background: #2a7; border-color: #185; color: #fff; font-weight: bold; }
+    #buy { background: #2a7; border-color: #185; color: #fff; font-weight: bold; font-size: 1.2rem; padding: .6rem 2rem; }
     #buy:hover { background: #185; }
     #buy:disabled { background: #ccc; border-color: #bbb; cursor: default; }
+    .category { border: 1px solid #e3e3e3; border-radius: 6px; padding: .5rem .75rem; margin-top: .75rem; }
+    .category summary { cursor: pointer; }
+    .category summary::marker { color: var(--accent); }
+    .category h3 { display: inline; margin: 0; }
+    .category table { margin-top: .4rem; }
+    .product-toggle { border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; }
+    .product-toggle::before { content: '▸ '; color: var(--accent); }
+    .product-toggle[aria-expanded="true"]::before { content: '▾ '; }
+    .product-toggle:hover { background: none; color: var(--accent); text-decoration: underline; }
+    .product-detail td { background: #fafafa; }
+    .product-detail dl { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1rem; margin: .25rem 0 .25rem 1rem; }
+    .product-detail dt { color: #666; }
+    .product-detail dd { margin: 0; }
+    .product-detail .incl-vat { font-weight: bold; color: var(--accent-dark); }
   </style>
 </head>
 <body>
@@ -32,21 +48,21 @@
   <main>
     <section>
       <h2>Products</h2>
-      <p class="muted">Prices in <span id="currency-code">EUR</span>, excluding shipping. Shown excl. VAT and incl. VAT.</p>
+      <p class="muted">Prices in <span id="currency-code">EUR</span>, excluding shipping and VAT. Click a product to see its price including VAT.</p>
       <div id="products"></div>
     </section>
     <section>
       <h2>Cart</h2>
       <table>
-        <thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Line total</th><th class="num">VAT</th><th></th></tr></thead>
+        <thead><tr><th>Product</th><th class="num">Price incl. VAT</th><th class="num">Qty</th><th class="num">Line total</th><th class="num">VAT</th><th></th></tr></thead>
         <tbody id="cart-lines"></tbody>
         <tfoot>
-          <tr><td>Subtotal (excl. VAT)</td><td></td><td class="num" id="subtotal"></td><td></td><td></td></tr>
-          <tr><td>VAT (<span id="vat-country">NL</span>)</td><td></td><td class="num" id="vat"></td><td></td><td></td></tr>
-          <tr><td>Total (incl. VAT)</td><td></td><td class="num" id="total"></td><td></td><td></td></tr>
+          <tr><td>Subtotal (excl. VAT)</td><td></td><td></td><td class="num" id="subtotal"></td><td></td><td></td></tr>
+          <tr><td>VAT (<span id="vat-country">NL</span>)</td><td></td><td></td><td class="num" id="vat"></td><td></td><td></td></tr>
+          <tr><td>Total (incl. VAT)</td><td></td><td></td><td class="num" id="total"></td><td></td><td></td></tr>
         </tfoot>
       </table>
-      <p><button id="buy">Buy</button> <button id="clear">Empty cart</button></p>
+      <p><button id="buy">Buy</button></p>
       <p id="confirmation"></p>
     </section>
   </main>
@@ -66,10 +82,16 @@
     const errorEl = document.getElementById('error');
     const confirmationEl = document.getElementById('confirmation');
 
+    // On /pl the shop acts as if the customer is in Poland (PLN, Polish VAT), whatever the browser language.
+    const headers = { 'Content-Type': 'application/json' };
+    if (/^\/pl\/?$/.test(location.pathname)) {
+      headers['Accept-Language'] = 'pl-PL';
+    }
+
     async function api(path, options) {
       errorEl.textContent = '';
       confirmationEl.textContent = '';
-      const response = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
+      const response = await fetch(path, { headers, ...options });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
         errorEl.textContent = (body && body.detail) || `${response.status} ${response.statusText}`;
@@ -78,31 +100,78 @@
       return body;
     }
 
+    function addButton(productId) {
+      const button = document.createElement('button');
+      button.textContent = 'Add';
+      button.onclick = () => addToCart(productId);
+      return button;
+    }
+
     function renderProducts(products) {
-      const byCategory = Map.groupBy(products, p => p.category);
       const container = document.getElementById('products');
       container.innerHTML = '';
-      for (const [category, items] of byCategory) {
-        const heading = document.createElement('h3');
-        heading.textContent = category;
-        container.appendChild(heading);
-        const table = document.createElement('table');
-        for (const p of items) {
-          const row = table.insertRow();
-          row.insertCell().textContent = p.name;
-          row.insertCell().innerHTML = `<span class="muted">${p.countryOfOrigin}</span>`;
-          const price = row.insertCell(); price.className = 'num muted'; price.textContent = money.format(p.price);
-          const inclVat = row.insertCell(); inclVat.className = 'num';
-          inclVat.textContent = money.format(p.priceInclVat);
-          inclVat.title = `incl. ${p.vatRate}% VAT`;
-          const action = row.insertCell(); action.className = 'num';
-          const button = document.createElement('button');
-          button.textContent = 'Add';
-          button.onclick = () => addToCart(p.id);
-          action.appendChild(button);
-        }
-        container.appendChild(table);
+      for (const [category, items] of Map.groupBy(products, p => p.category)) {
+        container.appendChild(renderCategory(category, items));
       }
+    }
+
+    function renderCategory(category, items) {
+      const container = document.createElement('div');
+      container.className = 'category';
+      // Each category collapses on a click on its name; all start open.
+      const collapsible = document.createElement('details');
+      collapsible.open = true;
+      const summary = document.createElement('summary');
+      const heading = document.createElement('h3');
+      heading.textContent = category;
+      summary.appendChild(heading);
+      collapsible.appendChild(summary);
+      container.appendChild(collapsible);
+      const table = document.createElement('table');
+      table.createTHead().innerHTML =
+        '<tr><th>Product</th><th>Origin</th><th class="num">Excl. VAT</th><th></th></tr>';
+      for (const p of items) {
+        const row = table.insertRow();
+        // A click on the product name unfolds its details, including the price incl. VAT, in the row below.
+        const toggle = document.createElement('button');
+        toggle.className = 'product-toggle';
+        toggle.textContent = p.name;
+        toggle.setAttribute('aria-expanded', 'false');
+        row.insertCell().appendChild(toggle);
+        row.insertCell().innerHTML = `<span class="muted">${p.countryOfOrigin}</span>`;
+        const price = row.insertCell(); price.className = 'num'; price.textContent = money.format(p.price);
+        const action = row.insertCell(); action.className = 'num';
+        action.appendChild(addButton(p.id));
+
+        const detailRow = table.insertRow();
+        detailRow.className = 'product-detail';
+        detailRow.hidden = true;
+        const cell = detailRow.insertCell();
+        cell.colSpan = 4;
+        cell.appendChild(renderProductDetail(p));
+        toggle.onclick = () => {
+          detailRow.hidden = !detailRow.hidden;
+          toggle.setAttribute('aria-expanded', String(!detailRow.hidden));
+        };
+      }
+      collapsible.appendChild(table);
+      return container;
+    }
+
+    function renderProductDetail(p) {
+      const details = document.createElement('dl');
+      for (const [label, value, className] of [
+        ['Product code', p.id],
+        ['Price excl. VAT', money.format(p.price)],
+        [`VAT (${p.vatRate}%)`, money.format(p.priceInclVat - p.price)],
+        ['Price incl. VAT', money.format(p.priceInclVat), 'incl-vat'],
+      ]) {
+        const dt = document.createElement('dt'); dt.textContent = label;
+        const dd = document.createElement('dd'); dd.textContent = value;
+        if (className) dd.className = className;
+        details.append(dt, dd);
+      }
+      return details;
     }
 
     function renderCart(cart) {
@@ -112,6 +181,7 @@
       for (const line of cart.lines) {
         const row = tbody.insertRow();
         row.insertCell().textContent = line.product.name;
+        const price = row.insertCell(); price.className = 'num'; price.textContent = money.format(line.priceInclVat);
         const qty = row.insertCell(); qty.className = 'num'; qty.textContent = line.quantity;
         const total = row.insertCell(); total.className = 'num'; total.textContent = money.format(line.lineTotal);
         const vat = row.insertCell(); vat.className = 'num muted'; vat.textContent = `${line.vatRate}%`;
@@ -143,7 +213,6 @@
         `Order #${order.orderNumber} placed: ${money.format(order.total)} (incl. ${money.format(order.vat)} VAT).`;
     };
 
-    document.getElementById('clear').onclick = async () => renderCart(await api('/api/cart', { method: 'DELETE' }));
 
     // Load the cart first: it tells us which currency the product prices are in.
     api('/api/cart').then(renderCart).then(() => api('/api/products')).then(renderProducts);
